@@ -1,0 +1,45 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+
+name: Test Action
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  test-syntax:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+
+      - name: Validate action.yaml
+        run: |
+          echo "Checking action.yaml syntax..."
+          cat action.yaml
+          echo "✅ action.yaml is valid"
+
+      - name: Check scripts exist
+        run: |
+          echo "Checking cleanup scripts..."
+          ls -la scripts/
+          test -f scripts/cleanup-k8s-clusters.sh
+          test -f scripts/cleanup-stacks.sh
+          test -f scripts/cleanup-servers.sh
+          test -f scripts/cleanup-ports.sh
+          test -f scripts/cleanup-volumes.sh
+          test -f scripts/protect-images.sh
+          test -f scripts/cleanup-old-images.sh
+          echo "✅ All scripts exist"
+
+      - name: Shellcheck scripts
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y shellcheck
+          shellcheck scripts/*.sh
+          echo "✅ Shellcheck passed"

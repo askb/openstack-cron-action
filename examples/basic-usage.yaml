@@ -1,0 +1,29 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+
+# Basic usage example
+
+name: OpenStack Cleanup - Basic
+
+on:
+  schedule:
+    - cron: '0 * * * *'
+  workflow_dispatch:
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          repository: lfit/lfreleng-actions
+          path: actions
+
+      - uses: ./actions/openstack-cron-action
+        with:
+          openstack_cloud: 'vex'
+          clouds_yaml: ${{ secrets.OPENSTACK_CLOUDS_YAML }}
+          jenkins_urls: 'https://jenkins.example.org'

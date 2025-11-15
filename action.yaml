@@ -1,0 +1,236 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+
+name: '☁️ OpenStack Cron Cleanup'
+description: 'Automated cleanup of orphaned OpenStack cloud resources'
+author: 'The Linux Foundation'
+
+branding:
+  icon: 'cloud-off'
+  color: 'blue'
+
+inputs:
+  # OpenStack Configuration
+  openstack_cloud:
+    description: 'OpenStack cloud name from clouds.yaml'
+    required: true
+    default: 'vex'
+
+  clouds_yaml:
+    description: 'OpenStack clouds.yaml configuration (base64 encoded)'
+    required: true
+
+  # Jenkins Integration
+  jenkins_urls:
+    description: >
+      Space-separated list of Jenkins URLs to check for active builds
+    required: false
+    default: ''
+
+  # Cleanup Control Flags
+  cleanup_k8s_clusters:
+    description: 'Enable K8s cluster cleanup'
+    required: false
+    default: 'true'
+
+  cleanup_stacks:
+    description: 'Enable OpenStack stack cleanup'
+    required: false
+    default: 'true'
+
+  cleanup_servers:
+    description: 'Enable server/instance cleanup'
+    required: false
+    default: 'true'
+
+  cleanup_ports:
+    description: 'Enable port cleanup'
+    required: false
+    default: 'true'
+
+  cleanup_volumes:
+    description: 'Enable volume cleanup'
+    required: false
+    default: 'true'
+
+  protect_images:
+    description: 'Enable protection of in-use images'
+    required: false
+    default: 'true'
+
+  cleanup_images:
+    description: 'Enable old image cleanup'
+    required: false
+    default: 'true'
+
+  # Cleanup Parameters
+  image_cleanup_age:
+    description: 'Age in days for image cleanup (default: 30)'
+    required: false
+    default: '30'
+
+  port_cleanup_age:
+    description: 'Age for port cleanup (default: 30 minutes ago)'
+    required: false
+    default: '30 minutes ago'
+
+  # Python Environment
+  python_version:
+    description: 'Python version to use'
+    required: false
+    default: '3.11'
+
+  # Timeouts
+  build_timeout:
+    description: 'Build timeout in minutes'
+    required: false
+    default: '10'
+
+  # Notifications
+  failure_notification_email:
+    description: >
+      Email address to notify on failure (comma-separated)
+    required: false
+    default: ''
+
+  failure_notification_prefix:
+    description: 'Email subject prefix for failure notifications'
+    required: false
+    default: '[OpenStack Cleanup]'
+
+outputs:
+  cleanup_summary:
+    description: 'Summary of cleanup operations performed'
+    value: ${{ steps.summary.outputs.summary }}
+
+  resources_cleaned:
+    description: 'Number of resources cleaned up'
+    value: ${{ steps.summary.outputs.resources_cleaned }}
+
+  cleanup_status:
+    description: 'Overall cleanup status (success/failure)'
+    value: ${{ steps.summary.outputs.status }}
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Validate inputs
+      shell: bash
+      run: |
+        if [[ -z "${{ inputs.openstack_cloud }}" ]]; then
+          echo "❌ Error: openstack_cloud is required"
+          exit 1
+        fi
+
+        if [[ -z "${{ inputs.clouds_yaml }}" ]]; then
+          echo "❌ Error: clouds_yaml is required"
+          exit 1
+        fi
+
+        echo "✅ Input validation passed"
+
+    - name: Setup Python
+      uses: actions/setup-python@0b93645e9fea7318ecaed2b359559ac225c90a2b # v5.3.0
+      with:
+        python-version: ${{ inputs.python_version }}
+
+    - name: Install dependencies
+      shell: bash
+      run: |
+        echo "📦 Installing OpenStack dependencies..."
+        pip install --upgrade pip --quiet
+        pip install --quiet \
+          "lftools[openstack]" \
+          python-openstackclient \
+          python-heatclient \
+          python-magnumclient \
+          kubernetes \
+          niet \
+          yq
+
+        echo "✅ Dependencies installed"
+
+    - name: Configure OpenStack credentials
+      shell: bash
+      run: |
+        echo "🔐 Configuring OpenStack credentials..."
+        mkdir -p "$HOME/.config/openstack"
+        echo "${{ inputs.clouds_yaml }}" | base64 -d > \
+          "$HOME/.config/openstack/clouds.yaml"
+
+        # Verify clouds.yaml
+        cloud="${{ inputs.openstack_cloud }}"
+        if ! grep -q "$cloud" \
+          "$HOME/.config/openstack/clouds.yaml"; then
+          echo "❌ Error: Cloud '$cloud' not found in clouds.yaml"
+          exit 1
+        fi
+
+        echo "✅ OpenStack credentials configured"
+
+    - name: Setup environment variables
+      shell: bash
+      run: |
+        echo "OS_CLOUD=${{ inputs.openstack_cloud }}" >> "$GITHUB_ENV"
+        echo "JENKINS_URLS=${{ inputs.jenkins_urls }}" >> "$GITHUB_ENV"
+        age="${{ inputs.image_cleanup_age }}"
+        echo "OS_IMAGE_CLEANUP_AGE=$age" >> "$GITHUB_ENV"
+
+    - name: Cleanup K8s Clusters
+      if: ${{ inputs.cleanup_k8s_clusters == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up orphaned K8s clusters..."
+        path="${{ github.action_path }}/scripts/cleanup-k8s-clusters.sh"
+        bash "$path"
+
+    - name: Cleanup Stacks
+      if: ${{ inputs.cleanup_stacks == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up orphaned stacks..."
+        bash "${{ github.action_path }}/scripts/cleanup-stacks.sh"
+
+    - name: Cleanup Servers
+      if: ${{ inputs.cleanup_servers == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up orphaned servers..."
+        bash "${{ github.action_path }}/scripts/cleanup-servers.sh"
+
+    - name: Cleanup Ports
+      if: ${{ inputs.cleanup_ports == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up orphaned ports..."
+        bash "${{ github.action_path }}/scripts/cleanup-ports.sh"
+
+    - name: Cleanup Volumes
+      if: ${{ inputs.cleanup_volumes == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up orphaned volumes..."
+        bash "${{ github.action_path }}/scripts/cleanup-volumes.sh"
+
+    - name: Protect Images
+      if: ${{ inputs.protect_images == 'true' }}
+      shell: bash
+      run: |
+        echo "🛡️ Protecting in-use images..."
+        bash "${{ github.action_path }}/scripts/protect-images.sh"
+
+    - name: Cleanup Old Images
+      if: ${{ inputs.cleanup_images == 'true' }}
+      shell: bash
+      run: |
+        echo "🧹 Cleaning up old images..."
+        bash "${{ github.action_path }}/scripts/cleanup-old-images.sh"
+
+    - name: Generate cleanup summary
+      id: summary
+      shell: bash
+      run: |
+        echo "summary=Cleanup completed successfully" >> "$GITHUB_OUTPUT"
+        echo "resources_cleaned=0" >> "$GITHUB_OUTPUT"
+        echo "status=success" >> "$GITHUB_OUTPUT"

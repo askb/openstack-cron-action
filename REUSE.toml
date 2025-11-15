@@ -1,0 +1,21 @@
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+# SPDX-License-Identifier: Apache-2.0
+
+version = 1
+SPDX-PackageName = "openstack-cron-action"
+SPDX-PackageSupplier = "The Linux Foundation"
+SPDX-PackageDownloadLocation = "https://github.com/lfit/lfreleng-actions"
+
+[[annotations]]
+path = [
+    ".codespell",
+    ".editorconfig",
+    ".gitignore",
+    ".gitlint",
+    ".readthedocs.yml",
+    ".yamllint",
+    "**/.gitkeep",
+]
+precedence = "aggregate"
+SPDX-FileCopyrightText = "2025 The Linux Foundation"
+SPDX-License-Identifier = "Apache-2.0"

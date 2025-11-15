@@ -1,0 +1,54 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+
+# Example: Scheduled OpenStack cleanup workflow
+# This workflow runs hourly to clean up orphaned resources
+
+name: OpenStack Cleanup
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      openstack_cloud:
+        description: 'OpenStack cloud name'
+        required: false
+        default: 'vex'
+      dry_run:
+        description: 'Dry run mode (skip actual cleanup)'
+        type: boolean
+        required: false
+        default: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout lfreleng-actions
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683 # v4.2.2
+        with:
+          repository: lfit/lfreleng-actions
+          path: lfreleng-actions
+
+      - name: Run OpenStack cleanup
+        uses: ./lfreleng-actions/openstack-cron-action
+        with:
+          openstack_cloud: ${{ inputs.openstack_cloud || 'vex' }}
+          clouds_yaml: ${{ secrets.OPENSTACK_CLOUDS_YAML }}
+          jenkins_urls: >
+            https://jenkins.opendaylight.org/releng
+            https://jenkins.opendaylight.org/sandbox
+          cleanup_k8s_clusters: 'true'
+          cleanup_stacks: 'true'
+          cleanup_servers: 'true'
+          cleanup_ports: 'true'
+          cleanup_volumes: 'true'
+          protect_images: 'true'
+          cleanup_images: 'true'
+          image_cleanup_age: '30'

@@ -1,0 +1,57 @@
+---
+# SPDX-License-Identifier: Apache-2.0
+# SPDX-FileCopyrightText: 2025 The Linux Foundation
+
+# Example: Scheduled OpenStack cleanup workflow using repository variables
+# This is the RECOMMENDED approach for project-agnostic deployments
+
+name: OpenStack Cleanup
+
+on:
+  schedule:
+    # Run every hour
+    - cron: '0 * * * *'
+
+  workflow_dispatch:
+    inputs:
+      openstack_cloud:
+        description: 'OpenStack cloud name'
+        required: false
+        default: 'vex'
+        type: string
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Run OpenStack cleanup
+        uses: askb/openstack-cron-action@main
+        with:
+          # Use repository variables for project-specific configuration
+          openstack_cloud: >
+            ${{ inputs.openstack_cloud || vars.OPENSTACK_CLOUD || 'vex' }}
+          clouds_yaml: ${{ secrets.OPENSTACK_CLOUDS_YAML }}
+          jenkins_urls: ${{ vars.JENKINS_URLS || '' }}
+          cleanup_k8s_clusters: 'true'
+          cleanup_stacks: 'true'
+          cleanup_servers: 'true'
+          cleanup_ports: 'true'
+          cleanup_volumes: 'true'
+          protect_images: 'true'
+          cleanup_images: 'true'
+          image_cleanup_age: '30'
+          failure_notification_email: ${{ vars.FAILURE_NOTIFICATION_EMAIL || '' }}
+          failure_notification_prefix: >
+            ${{ vars.NOTIFICATION_PREFIX || '[OpenStack Cleanup]' }}
+
+      - name: Report cleanup summary
+        if: always()
+        run: |
+          {
+            echo "### OpenStack Cleanup Summary"
+            echo "- **Cloud**: ${{ inputs.openstack_cloud || vars.OPENSTACK_CLOUD || 'vex' }}"
+            echo "- **Status**: ${{ job.status }}"
+            echo "- **Timestamp**: $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+          } >> "$GITHUB_STEP_SUMMARY"
