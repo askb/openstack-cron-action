@@ -19,7 +19,34 @@ inputs:
 
   clouds_yaml:
     description: 'OpenStack clouds.yaml configuration (base64 encoded)'
-    required: true
+    required: false
+    default: ''
+
+  # OpenStack Credentials (alternative to clouds_yaml)
+  openstack_auth_url:
+    description: 'OpenStack auth URL'
+    required: false
+    default: ''
+  openstack_username:
+    description: 'OpenStack username'
+    required: false
+    default: ''
+  openstack_password:
+    description: 'OpenStack password'
+    required: false
+    default: ''
+  openstack_project_id:
+    description: 'OpenStack project ID'
+    required: false
+    default: ''
+  openstack_domain_name:
+    description: 'OpenStack domain name'
+    required: false
+    default: 'Default'
+  openstack_region:
+    description: 'OpenStack region'
+    required: false
+    default: ''
 
   # Jenkins Integration
   jenkins_urls:
@@ -123,8 +150,10 @@ runs:
           exit 1
         fi
 
-        if [[ -z "${{ inputs.clouds_yaml }}" ]]; then
-          echo "❌ Error: clouds_yaml is required"
+        # Validate that either clouds_yaml OR credentials are provided
+        if [[ -z "${{ inputs.clouds_yaml }}" ]] && [[ -z "${{ inputs.openstack_auth_url }}" ]]; then
+          echo "❌ Error: Either clouds_yaml or OpenStack credentials required"
+          echo "   Provide clouds_yaml OR (auth_url + username + password + project_id)"
           exit 1
         fi
 
@@ -156,8 +185,28 @@ runs:
       run: |
         echo "🔐 Configuring OpenStack credentials..."
         mkdir -p "$HOME/.config/openstack"
-        echo "${{ inputs.clouds_yaml }}" | base64 -d > \
-          "$HOME/.config/openstack/clouds.yaml"
+
+        # Create clouds.yaml from base64 input or generate from credentials
+        if [[ -n "${{ inputs.clouds_yaml }}" ]]; then
+          echo "${{ inputs.clouds_yaml }}" | base64 -d > \
+            "$HOME/.config/openstack/clouds.yaml"
+          echo "✅ Using provided clouds.yaml"
+        elif [[ -n "${{ inputs.openstack_auth_url }}" ]]; then
+          # Auto-generate clouds.yaml from individual credentials
+          cat > "$HOME/.config/openstack/clouds.yaml" << 'EOF'
+        clouds:
+          ${{ inputs.openstack_cloud }}:
+            auth:
+              auth_url: ${{ inputs.openstack_auth_url }}
+              username: ${{ inputs.openstack_username }}
+              password: ${{ inputs.openstack_password }}
+              project_id: ${{ inputs.openstack_project_id }}
+              user_domain_name: ${{ inputs.openstack_domain_name }}
+              project_domain_name: ${{ inputs.openstack_domain_name }}
+            region_name: ${{ inputs.openstack_region }}
+        EOF
+          echo "✅ Generated clouds.yaml from credentials"
+        fi
 
         # Verify clouds.yaml
         cloud="${{ inputs.openstack_cloud }}"
