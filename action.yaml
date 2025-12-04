@@ -193,18 +193,27 @@ runs:
           echo "✅ Using provided clouds.yaml"
         elif [[ -n "${{ inputs.openstack_auth_url }}" ]]; then
           # Auto-generate clouds.yaml from individual credentials
+          # Assign to shell variables to avoid any issues with GitHub Actions variable expansion
+          cloud_name="${{ inputs.openstack_cloud }}"
+          auth_url="${{ inputs.openstack_auth_url }}"
+          username="${{ inputs.openstack_username }}"
+          password="${{ inputs.openstack_password }}"
+          project_id="${{ inputs.openstack_project_id }}"
+          domain_name="${{ inputs.openstack_domain_name }}"
+          region="${{ inputs.openstack_region }}"
+          
           cat > "$HOME/.config/openstack/clouds.yaml" << EOF
-        clouds:
-          ${{ inputs.openstack_cloud }}:
-            auth:
-              auth_url: ${{ inputs.openstack_auth_url }}
-              username: ${{ inputs.openstack_username }}
-              password: ${{ inputs.openstack_password }}
-              project_id: ${{ inputs.openstack_project_id }}
-              user_domain_name: ${{ inputs.openstack_domain_name }}
-              project_domain_name: ${{ inputs.openstack_domain_name }}
-            region_name: ${{ inputs.openstack_region }}
-        EOF
+clouds:
+  ${cloud_name}:
+    auth:
+      auth_url: ${auth_url}
+      username: ${username}
+      password: ${password}
+      project_id: ${project_id}
+      user_domain_name: ${domain_name}
+      project_domain_name: ${domain_name}
+    region_name: ${region}
+EOF
           echo "✅ Generated clouds.yaml from credentials"
         fi
 
