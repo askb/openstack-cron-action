@@ -193,7 +193,7 @@ runs:
           echo "✅ Using provided clouds.yaml"
         elif [[ -n "${{ inputs.openstack_auth_url }}" ]]; then
           # Auto-generate clouds.yaml from individual credentials
-          cat > "$HOME/.config/openstack/clouds.yaml" << 'EOF'
+          cat > "$HOME/.config/openstack/clouds.yaml" << EOF
         clouds:
           ${{ inputs.openstack_cloud }}:
             auth:

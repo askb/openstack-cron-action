@@ -18,7 +18,9 @@ echo "INFO: Checking for orphaned stacks on cloud: $os_cloud"
 # Use lftools to cleanup orphaned stacks
 if [[ -n "$jenkins_urls" ]]; then
     echo "INFO: Will check Jenkins URLs for active builds: $jenkins_urls"
-    lftools openstack --os-cloud "$os_cloud" stack cleanup --jenkins "$jenkins_urls"
+    # lftools stack delete-stale takes jenkins URLs as positional arguments
+    # shellcheck disable=SC2086
+    lftools openstack --os-cloud "$os_cloud" stack delete-stale $jenkins_urls
 else
     echo "WARN: No Jenkins URLs provided, skipping stack cleanup to be safe"
 fi
