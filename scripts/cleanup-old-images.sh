@@ -19,9 +19,19 @@ fi
 # Capture lftools output to count deleted images
 output=$(lftools openstack --os-cloud "${os_cloud}" image cleanup \
     --days="${os_image_cleanup_age}" 2>&1) || true
-echo "$output"
+printf '%s\n' "$output"
 
 # Count lines matching 'Removed "..." from <cloud>.'
-deleted_count=$(echo "$output" | grep -c '^Removed "' || true)
+deleted_count=$(printf '%s\n' "$output" | grep -c '^Removed "' || true)
+# Count images lftools selected, summed over clouds: 'Removing N images from <cloud>.'
+targeted_count=$(printf '%s\n' "$output" | awk '/^Removing [0-9]+ images from /{sum+=$2} END{print sum+0}')
 echo "deleted_count=${deleted_count}" >> "${GITHUB_OUTPUT:-/dev/null}"
-echo "✅ Old image cleanup complete (${deleted_count} images removed)"
+echo "targeted_count=${targeted_count}" >> "${GITHUB_OUTPUT:-/dev/null}"
+echo "✅ Old image cleanup complete (${deleted_count} of ${targeted_count} images removed)"
+
+# A run that selects images and deletes none is a silent no-op: lftools skips
+# and keeps skipping, so the same images are retried every run forever. Warn
+# only. This must not fail the step or the cleanup stages after it.
+if [[ "${targeted_count}" -gt 0 && "${deleted_count}" -eq 0 ]]; then
+    echo "::warning title=Image cleanup removed nothing::Selected ${targeted_count} image(s) for removal but removed 0. Check the log for skip reasons (duplicate image names, protected, shared, or owned by another project)."
+fi
