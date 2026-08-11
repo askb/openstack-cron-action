@@ -58,3 +58,48 @@ jobs:
           sudo apt-get install -y shellcheck
           shellcheck scripts/*.sh
           echo "✅ Shellcheck passed"
+
+      - name: Test old image cleanup no-op guard
+        run: |
+          set -euo pipefail
+          mkdir -p stub
+          cat > stub/lftools <<'EOT'
+          #!/bin/bash
+          cat "$FAKE_OUT"
+          exit 1
+          EOT
+          chmod +x stub/lftools
+
+          # lftools selected images but skipped every one of them
+          cat > noop.txt <<'EOT'
+          Removing 67 images from vex.
+          WARNING: More than one Image exists with the name 'dup'.. Skipping image...
+          EOT
+          # lftools removed everything it selected
+          cat > ok.txt <<'EOT'
+          Removing 2 images from vex.
+          Removed "img-a" from vex.
+          Removed "img-b" from vex.
+          EOT
+
+          run_case() {
+            PATH="$PWD/stub:$PATH" FAKE_OUT="$PWD/$1" GITHUB_OUTPUT="$PWD/$2" \
+              OS_CLOUD=vex bash scripts/cleanup-old-images.sh > "$3" 2>&1
+          }
+
+          # A failing lftools must not abort the step or the stages after it
+          : > noop.env
+          run_case noop.txt noop.env noop.log
+          grep -qx 'targeted_count=67' noop.env
+          grep -qx 'deleted_count=0' noop.env
+          grep -q '::warning' noop.log
+          echo "✅ no-op run warns and exits 0"
+
+          : > ok.env
+          run_case ok.txt ok.env ok.log
+          grep -qx 'targeted_count=2' ok.env
+          grep -qx 'deleted_count=2' ok.env
+          grep -q '::warning' ok.log && exit 1
+          echo "✅ healthy run does not warn"
+
+          rm -rf stub noop.txt ok.txt noop.env ok.env noop.log ok.log
